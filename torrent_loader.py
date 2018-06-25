@@ -45,12 +45,12 @@ def add_torrent(torrent_file, dl_path):
 if __name__ == '__main__':
 	if len(sys.argv) != 3:
 		print('Usage: torrent_loader.py torrent_file search_path')
-		exit()
+		sys.exit()
 
 	found_path = find_path(sys.argv[1], sys.argv[2])
 
 	if not found_path:
 		print('Couldn\'t find any matching file(s)')
-		exit()
+		sys.exit()
 
 	add_torrent(sys.argv[1], found_path)

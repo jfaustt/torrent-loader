@@ -1,1 +1,2 @@
+qbittorrent==0.1.6
 torrent_parser==0.3.0

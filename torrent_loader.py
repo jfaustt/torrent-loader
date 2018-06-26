@@ -4,6 +4,16 @@ import time
 import torrent_parser as tp
 from qbittorrent import Client
 
+# Checks whether a local folder fully matches a torrent's file structure (by name only)
+def assert_valid(torrent_file_list, folder):
+	file_list = []
+
+	for path, _, files in os.walk(folder):
+		for f in files:
+			file_list.append(path.replace(folder, '').split('\\')[1::] + [f])
+
+	return file_list == torrent_file_list
+
 def find_path(torrent_file, search_path):
 	# Get a list of files in the torrent
 	torrent = tp.parse_torrent_file(torrent_file)
@@ -23,8 +33,9 @@ def find_path(torrent_file, search_path):
 			if f == target:
 				folder_depth = len(torrent_files[0]) - 1
 				root = path[::-1][path[::-1].replace('\\', 'x', folder_depth - 1).find('\\') + 1:][::-1]
-
-				return root
+				
+				if (not 'files' in torrent['info']) or assert_valid(torrent_files, root):
+					return root
 
 def add_torrent(torrent_file, dl_path):
 	torrent = tp.parse_torrent_file(torrent_file)
@@ -62,6 +73,7 @@ def monitor_folder(folder, search_path):
 if __name__ == '__main__':
 	if len(sys.argv) < 3:
 		print('Usage: torrent_loader.py torrent_file search_path')
+		print('       torrent_loader.py -m monitor_folder search_path')
 		sys.exit()
 
 	if sys.argv[1] == '-m': # Monitor folder mode

@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import torrent_parser as tp
 from qbittorrent import Client
 
@@ -42,15 +43,37 @@ def add_torrent(torrent_file, dl_path):
 
 	print('Added "' + torrent_file + '", content found in "' + dl_path + '"')
 
+def monitor_folder(folder, search_path):
+	for path, _, files in os.walk(folder):
+		for f in files:
+			_, ext = os.path.splitext(f)
+			
+			if ext == '.torrent':
+				file_path = path + '\\' + f
+				found_path = find_path(file_path, search_path)
+
+				if not found_path:
+					print('Couldn\'t find any matching file(s) for "' + file_path + '"')
+					os.remove(file_path)
+				else:
+					add_torrent(file_path, found_path)
+
 if __name__ == '__main__':
-	if len(sys.argv) != 3:
+	if len(sys.argv) < 3:
 		print('Usage: torrent_loader.py torrent_file search_path')
 		sys.exit()
 
-	found_path = find_path(sys.argv[1], sys.argv[2])
+	if sys.argv[1] == '-m': # Monitor folder mode
+		print('Monitoring "' + sys.argv[2] + '" for torrent files...\n')
 
-	if not found_path:
-		print('Couldn\'t find any matching file(s)')
-		sys.exit()
+		while True:
+			monitor_folder(sys.argv[2], sys.argv[3])
+			time.sleep(5)
+	else:
+		found_path = find_path(sys.argv[1], sys.argv[2])
 
-	add_torrent(sys.argv[1], found_path)
+		if not found_path:
+			print('Couldn\'t find any matching file(s)')
+			sys.exit()
+
+		add_torrent(sys.argv[1], found_path)

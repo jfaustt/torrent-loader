@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import configparser
 import torrent_parser as tp
 from qbittorrent import Client
 
@@ -49,9 +50,38 @@ def add_torrent(torrent_file, dl_path):
 		# Adjust the DL path to be one folder up, so that it matches up correctly
 		dl_path = head
 
-	qb = Client('http://127.0.0.1:8080/')
-	qb.download_from_file(open(torrent_file, 'rb'), savepath=dl_path)
+	config = configparser.ConfigParser()
+	config.read('config.ini')
 
+	if not 'qBittorrent' in config:
+		print('Torrent Loader requires that qBittorrent WebUI is enabled.')
+		address = input('Address of WebUI (e.g. http://localhost:8080/): ')
+		secured = input('Does WebUI require a login? (y/n) ')
+
+		username = 'admin'
+		password = 'admin'
+		
+		if secured == 'y':
+			username = input('Username: ')
+			password = input('Password: ')
+
+		config['qBittorrent'] = {
+			'address': address,
+			'secured': secured,
+			'username': username,
+			'password': password
+		}
+
+		print()
+
+	with open('config.ini', 'w') as config_file:
+		config.write(config_file)
+
+	qb = Client(config['qBittorrent']['address'])
+	if config['qBittorrent']['secured'] == 'y':
+		qb.login(config['qBittorrent']['username'], config['qBittorrent']['password'])
+
+	qb.download_from_file(open(torrent_file, 'rb'), savepath=dl_path)
 	print('Added "' + torrent_file + '", content found in "' + dl_path + '"')
 
 def monitor_folder(folder, search_path):

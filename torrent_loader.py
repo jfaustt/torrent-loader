@@ -54,9 +54,10 @@ def monitor_folder(folder, search_path):
 
 				if not found_path:
 					print('Couldn\'t find any matching file(s) for "' + file_path + '"')
-					os.remove(file_path)
 				else:
 					add_torrent(file_path, found_path)
+
+				os.remove(file_path) # Remove the torrent so that it isn't processed again
 
 if __name__ == '__main__':
 	if len(sys.argv) < 3:

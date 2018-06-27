@@ -5,6 +5,8 @@ import configparser
 import torrent_parser as tp
 from qbittorrent import Client
 
+strict_mode = True
+
 # Checks whether a local folder fully matches a torrent's file structure (by name only)
 def assert_valid(torrent_file_list, folder):
 	file_list = []
@@ -12,8 +14,8 @@ def assert_valid(torrent_file_list, folder):
 	for path, _, files in os.walk(folder):
 		for f in files:
 			file_list.append(path.replace(folder, '').split('\\')[1::] + [f])
-
-	return file_list == torrent_file_list
+	
+	return all(x in file_list for x in torrent_file_list) # Allow for extra content in the structure
 
 def find_path(torrent_file, search_path):
 	# Get a list of files in the torrent
@@ -26,17 +28,23 @@ def find_path(torrent_file, search_path):
 	else: # If the torrent contains only a single file, the format is a bit different
 		torrent_files.append([torrent['info']['name']])
 
-	# Search for a file matching (by filename) the first in the list
-	target = torrent_files[0][len(torrent_files[0]) - 1]
+	# Search for a file matching (by filename) any defined in the torrent
+	torrent_files_only = []
+
+	# Get a list of just the files in the torrent, ignoring structure
+	for f in torrent_files:
+		torrent_files_only.append(f[len(f) - 1])
 
 	for path, _, files in os.walk(search_path):
 		for f in files:
-			if f == target:
+			if f in torrent_files_only:
 				folder_depth = len(torrent_files[0]) - 1
 				root = path[::-1][path[::-1].replace('\\', 'x', folder_depth - 1).find('\\') + 1:][::-1]
 				
-				if (not 'files' in torrent['info']) or assert_valid(torrent_files, root):
+				if (not strict_mode) or assert_valid(torrent_files, root):
 					return root
+				else:
+					return 'partial'
 
 def add_torrent(torrent_file, dl_path):
 	torrent = tp.parse_torrent_file(torrent_file)
@@ -81,8 +89,11 @@ def add_torrent(torrent_file, dl_path):
 	if config['qBittorrent']['secured'] == 'y':
 		qb.login(config['qBittorrent']['username'], config['qBittorrent']['password'])
 
-	qb.download_from_file(open(torrent_file, 'rb'), savepath=dl_path)
-	print('Added "' + torrent_file + '", content found in "' + dl_path + '"')
+	try:
+		qb.download_from_file(open(torrent_file, 'rb'), savepath=dl_path)
+		print('Added "' + torrent_file + '", content found in "' + dl_path + '"')
+	except:
+		print('An error occurred; the torrent probably already exists (' + torrent_file + ')')
 
 def monitor_folder(folder, search_path):
 	for path, _, files in os.walk(folder):
@@ -95,6 +106,8 @@ def monitor_folder(folder, search_path):
 
 				if not found_path:
 					print('Couldn\'t find any matching file(s) for "' + file_path + '"')
+				elif found_path == 'partial':
+					print('Found only partial matching file(s) for "' + file_path + '"')
 				else:
 					add_torrent(file_path, found_path)
 
@@ -102,9 +115,14 @@ def monitor_folder(folder, search_path):
 
 if __name__ == '__main__':
 	if len(sys.argv) < 3:
-		print('Usage: torrent_loader.py torrent_file search_path')
-		print('       torrent_loader.py -m monitor_folder search_path')
+		print('Usage: torrent_loader.py torrent_file search_path [-l]')
+		print('       torrent_loader.py -m monitor_folder search_path [-l]')
+		print()
+		print('  -l   Lenient: Adds torrents even if their content is only partially found.')
 		sys.exit()
+
+	if '-l' in sys.argv: # Lenient
+		strict_mode = False
 
 	if sys.argv[1] == '-m': # Monitor folder mode
 		print('Monitoring "' + sys.argv[2] + '" for torrent files...\n')
@@ -117,6 +135,7 @@ if __name__ == '__main__':
 
 		if not found_path:
 			print('Couldn\'t find any matching file(s)')
-			sys.exit()
-
-		add_torrent(sys.argv[1], found_path)
+		elif found_path == 'partial':
+			print('Found only partial matching file(s). Use -l to add as torrent anyway. Note that missing content will be downloaded!')
+		else:
+			add_torrent(sys.argv[1], found_path)
